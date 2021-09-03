@@ -18,6 +18,11 @@ jobs:
         with:
           fetch-depth: 1
 
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v1
+        with:
+          node-version: ${{ matrix.node-version }}
+
       # tests run fine without this, but its here in case
 #     - name: Install Chrome
 #       uses: browser-actions/setup-chrome@latest
@@ -34,11 +39,6 @@ jobs:
           key: ${{ runner.os }}-node-${{ matrix.node-version }}-${{ hashFiles('**/package-lock.json') }}
           restore-keys: |
             ${{ runner.os }}-node-${{ matrix.node-version }}
-
-      - name: Use Node.js ${{ matrix.node-version }}
-        uses: actions/setup-node@v1
-        with:
-          node-version: ${{ matrix.node-version }}
 
       - name: npm install
         run: npm install && cd browser && npm install
