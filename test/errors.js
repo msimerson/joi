@@ -38,7 +38,8 @@ describe('errors', () => {
         const err = Joi.valid('foo').validate('bar', { errors: { stack: true } }).error;
         expect(err).to.be.an.error();
         expect(err.isJoi).to.be.true();
-        expect(err.stack).to.contain('at Object.exports.process');
+        expect(err.stack).to.contain('    at ');
+        expect(err.stack).to.contain('exports.process');
     });
 
     it('supports custom errors when validating types', () => {
@@ -289,14 +290,16 @@ describe('errors', () => {
 
         const schema = Joi.object({
             a: Joi.number().min(10),
-            lang: Joi.string().required()
+            lang: Joi.string().required(),
+            select: ['x']
         })
             .prefs({
                 messages,
                 errors: {
                     language: Joi.ref('/lang'),
                     wrap: {
-                        label: '{}'
+                        label: '{}',
+                        string: '`\''
                     }
                 }
             });
@@ -305,6 +308,7 @@ describe('errors', () => {
         expect(schema.validate({ a: 1, lang: 'latin' }).error).to.be.an.error('{a} angustus');
         expect(schema.validate({ a: 1, lang: 'unknown' }).error).to.be.an.error('{a} must be greater than or equal to 10');
         expect(schema.validate({ a: 1, lang: 'empty' }).error).to.be.an.error('{a} must be greater than or equal to 10');
+        expect(schema.validate({ select: 'y', a: 20, lang: 'empty' }).error).to.be.an.error('{select} must be [`x\']');
     });
 
     it('supports render preference', () => {
