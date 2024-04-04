@@ -1052,7 +1052,7 @@ describe('any', () => {
             ]);
         });
 
-        it('should not overide a value when value is given', () => {
+        it('should not override a value when value is given', () => {
 
             const schema = Joi.object({ foo: Joi.string().default('bar') });
             const input = { foo: 'test' };
@@ -1657,6 +1657,36 @@ describe('any', () => {
                 ]
             });
         });
+
+        it('does not run on invalid array items', async () => {
+
+            const schema = Joi.array().items(
+                Joi.string().min(5).external((value) => value + value),
+                Joi.string().external((value) => value + '-')
+            );
+
+            expect(await schema.validateAsync(['x'])).to.equal(['x-']);
+        });
+
+        it('does not run on invalid alternatives', async () => {
+
+            const schema = Joi.alternatives(
+                Joi.string().min(5).external((value) => value + value),
+                Joi.string().external((value) => value + '-')
+            );
+
+            expect(await schema.validateAsync('x')).to.equal('x-');
+        });
+
+        it('does not run on invalid alternatives with match mode "one"', async () => {
+
+            const schema = Joi.alternatives().try(
+                Joi.string().min(5).external((value) => value + value),
+                Joi.string().external((value) => value + '-')
+            ).match('one');
+
+            expect(await schema.validateAsync('x')).to.equal('x-');
+        });
     });
 
     describe('failover()', () => {
@@ -1923,6 +1953,36 @@ describe('any', () => {
             expect(schema.validate(1, { errors: { language: 'latin' } }).error).to.be.an.error('"valorem" angustus');
             expect(schema.validate(1, { errors: { language: 'unknown' } }).error).to.be.an.error('"value" must be greater than or equal to 10');
             expect(schema.label('special').validate(1, { errors: { language: 'english' } }).error).to.be.an.error('"special" too small');
+        });
+
+        it('overrides wildcard message in specific language', () => {
+
+            const messages = {
+                english: {
+                    root: 'value',
+                    'number.min': '{#label} too small',
+                    '*': '{#label} is something else'
+                }
+            };
+
+            const schema = Joi.number().min(10).max(11).messages(messages);
+
+            expect(schema.validate(1, { errors: { language: 'english' } }).error).to.be.an.error('"value" too small');
+            expect(schema.validate(12, { errors: { language: 'english' } }).error).to.be.an.error('"value" is something else');
+        });
+
+        it('overrides wildcard message', () => {
+
+            const messages = {
+                root: 'value',
+                'number.min': '{#label} too small',
+                '*': '{#label} is something else'
+            };
+
+            const schema = Joi.number().min(10).max(11).messages(messages);
+
+            expect(schema.validate(1).error).to.be.an.error('"value" too small');
+            expect(schema.validate(12).error).to.be.an.error('"value" is something else');
         });
 
         it('overrides message in multiple language (nested)', () => {

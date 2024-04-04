@@ -123,6 +123,14 @@ describe('number', () => {
 
     describe('greater()', () => {
 
+        it('throws when limit is undefined', () => {
+
+            expect(() => {
+
+                Joi.number().greater();
+            }).to.throw('limit must be a number or reference');
+        });
+
         it('throws when limit is not a number', () => {
 
             expect(() => {
@@ -244,6 +252,14 @@ describe('number', () => {
     });
 
     describe('less()', () => {
+
+        it('throws when limit is undefined', () => {
+
+            expect(() => {
+
+                Joi.number().less();
+            }).to.throw('limit must be a number or reference');
+        });
 
         it('throws when limit is not a number', () => {
 
@@ -379,6 +395,14 @@ describe('number', () => {
 
     describe('max()', () => {
 
+        it('throws when limit is undefined', () => {
+
+            expect(() => {
+
+                Joi.number().max();
+            }).to.throw('limit must be a number or reference');
+        });
+
         it('throws when limit is not a number', () => {
 
             expect(() => {
@@ -497,6 +521,11 @@ describe('number', () => {
     });
 
     describe('min()', () => {
+
+        it('throws when limit is undefined', () => {
+
+            expect(() => Joi.number().min()).to.throw('limit must be a number or reference');
+        });
 
         it('throws when limit is not a number', () => {
 
@@ -660,6 +689,14 @@ describe('number', () => {
 
     describe('multiple()', () => {
 
+        it('throws when base is undefined', () => {
+
+            expect(() => {
+
+                Joi.number().multiple();
+            }).to.throw('base must be a positive number or reference');
+        });
+
         it('throws when multiple is not a number', () => {
 
             expect(() => {
@@ -710,11 +747,53 @@ describe('number', () => {
             ]);
         });
 
+        it('handles precision errors correctly', () => {
+
+            const cases = [
+                [3600000, [
+                    [14400000, true]
+                ]],
+                [0.01, [
+                    [2.03, true],
+                    [2.029999999999, false, {
+                        message: '"value" must be a multiple of 0.01',
+                        path: [],
+                        type: 'number.multiple',
+                        context: { multiple: 0.01, value: 2.029999999999, label: 'value' }
+                    }],
+                    [2.030000000001, false, {
+                        message: '"value" must be a multiple of 0.01',
+                        path: [],
+                        type: 'number.multiple',
+                        context: { multiple: 0.01, value: 2.030000000001, label: 'value' }
+                    }],
+                    [0.03, true]
+                ]],
+                [0.0000000001, [
+                    [0.2, true]
+                ]],
+                [0.000000101, [
+                    [0.101, true],
+                    [0.10101, false, {
+                        message: '"value" must be a multiple of 1.01e-7',
+                        path: [],
+                        type: 'number.multiple',
+                        context: { multiple: 0.000000101, value: 0.10101, label: 'value' }
+                    }]
+                ]]
+            ];
+
+            for (const [multiple, tests] of cases) {
+                const schema = Joi.number().multiple(multiple);
+                Helper.validate(schema, tests);
+            }
+        });
+
         it('handles floats multiples correctly', () => {
 
             const schema = Joi.number().multiple(3.5);
             Helper.validate(schema, [
-                [0, true], // 0 is a multiple of every integer
+                [0, true],  // 0 is a multiple of every number
                 [3.5, true],
                 [3.6, false, {
                     message: '"value" must be a multiple of 3.5',
@@ -741,6 +820,17 @@ describe('number', () => {
                     type: 'number.multiple',
                     context: { multiple: 3.5, value: 10.499, label: 'value' }
                 }]
+            ]);
+        });
+
+        it('handles 0.1 multiples', () => {
+
+            const schema = Joi.number().multiple(0.1);
+            Helper.validate(schema, [
+                [0, true],  // 0 is a multiple of every number
+                [3.5, true],
+                [100.1, true],
+                [3.61, false, '"value" must be a multiple of 0.1']
             ]);
         });
 
@@ -1098,6 +1188,8 @@ describe('number', () => {
                 ['-00100e-003', true, -0.1],
                 ['-001231.0133210e003', true, -1231013.321],
                 ['+001231.0133210e003', true, 1231013.321],
+                ['1.9642346977926364E-5', true, 0.000019642346977926364],
+                ['9.4e-1', true, 0.94],
                 ['0.00000095', true, 0.00000095],
                 ['.5', true, 0.5],
                 ['1 some text', false, {
@@ -1950,6 +2042,12 @@ describe('number', () => {
                     path: [],
                     type: 'number.unsafe',
                     context: { value: 90071992549000000, label: 'value' }
+                }],
+                ['1.9642346977926366E-5', false, {
+                    message: '"value" must be a safe number',
+                    path: [],
+                    type: 'number.unsafe',
+                    context: { value: '1.9642346977926366E-5', label: 'value' }
                 }],
                 [9007199254740992, false, {
                     message: '"value" must be a safe number',

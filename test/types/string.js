@@ -1179,7 +1179,7 @@ describe('string', () => {
 
         it('describes various versions of a guid', () => {
 
-            const schema = Joi.string().guid({ version: ['uuidv1', 'uuidv3', 'uuidv5'] });
+            const schema = Joi.string().guid({ version: ['uuidv1', 'uuidv3', 'uuidv5', 'uuidv8'] });
 
             expect(schema.describe()).to.equal({
                 type: 'string',
@@ -1188,7 +1188,7 @@ describe('string', () => {
                         name: 'guid',
                         args: {
                             options: {
-                                version: ['uuidv1', 'uuidv3', 'uuidv5']
+                                version: ['uuidv1', 'uuidv3', 'uuidv5', 'uuidv8']
                             }
                         }
                     }
@@ -1213,6 +1213,58 @@ describe('string', () => {
                         }
                     }
                 ]
+            });
+        });
+
+        it('describes a hex string', () => {
+
+            expect(Joi.string().hex().describe()).to.equal({
+                type: 'string',
+                rules: [{
+                    name: 'hex',
+                    args: {
+                        options: {
+                            byteAligned: false,
+                            prefix: false
+                        }
+                    }
+                }]
+            });
+            expect(Joi.string().hex({ byteAligned: true }).describe()).to.equal({
+                type: 'string',
+                rules: [{
+                    name: 'hex',
+                    args: {
+                        options: {
+                            byteAligned: true,
+                            prefix: false
+                        }
+                    }
+                }]
+            });
+            expect(Joi.string().hex({ prefix: true }).describe()).to.equal({
+                type: 'string',
+                rules: [{
+                    name: 'hex',
+                    args: {
+                        options: {
+                            byteAligned: false,
+                            prefix: true
+                        }
+                    }
+                }]
+            });
+            expect(Joi.string().hex({ prefix: 'optional' }).describe()).to.equal({
+                type: 'string',
+                rules: [{
+                    name: 'hex',
+                    args: {
+                        options: {
+                            byteAligned: false,
+                            prefix: 'optional'
+                        }
+                    }
+                }]
             });
         });
     });
@@ -1271,7 +1323,8 @@ describe('string', () => {
                     type: 'string.domain',
                     context: { value: '"example.com', label: 'value' }
                 }],
-                ['mail@example.com', false, '"value" must contain a valid domain name']
+                ['mail@example.com', false, '"value" must contain a valid domain name'],
+                ['joi.dev.whatevertldiwant', false, '"value" must contain a valid domain name']
             ]);
         });
 
@@ -1333,6 +1386,37 @@ describe('string', () => {
                 type: 'string.domain',
                 context: { value: 'something', label: 'item', key: 'item' }
             }]]);
+        });
+
+        it('validates domain with underscores', () => {
+
+            const validSchema = Joi.string().domain({ allowUnderscore: true });
+            Helper.validate(validSchema, [
+                ['_acme-challenge.example.com', true],
+                ['_abc.example.com', true]
+            ]);
+
+            const invalidSchema = Joi.string().domain();
+            Helper.validate(invalidSchema, [
+                ['_acme-challenge.example.com', false, {
+                    context: {
+                        label: 'value',
+                        value: '_acme-challenge.example.com'
+                    },
+                    message: '"value" must contain a valid domain name',
+                    path: [],
+                    type: 'string.domain'
+                }],
+                ['_abc.example.com', false, {
+                    context: {
+                        label: 'value',
+                        value: '_abc.example.com'
+                    },
+                    message: '"value" must contain a valid domain name',
+                    path: [],
+                    type: 'string.domain'
+                }]
+            ]);
         });
     });
 
@@ -1412,7 +1496,9 @@ describe('string', () => {
                     path: [],
                     type: 'string.email',
                     context: { value: '123456789012345678901234567890123456789012345678901234567890@12345678901234567890123456789012345678901234567890123456789.12345678901234567890123456789012345678901234567890123456789.12345678901234567890123456789012345678901234567890123456789.12345.toolong.com', invalids: ['123456789012345678901234567890123456789012345678901234567890@12345678901234567890123456789012345678901234567890123456789.12345678901234567890123456789012345678901234567890123456789.12345678901234567890123456789012345678901234567890123456789.12345.toolong.com'], label: 'value' }
-                }]
+                }],
+                ['foo@bar%2ecom', false, '"value" must be a valid email'],
+                ['invalid_tlds@email.ccc', false, '"value" must be a valid email']
             ]);
         });
 
@@ -2037,7 +2123,7 @@ describe('string', () => {
         it('throws when options.version is invalid', () => {
 
             expect(() => Joi.string().guid({ version: 42 })).to.throw('version at position 0 must be a string');
-            expect(() => Joi.string().guid({ version: '42' })).to.throw('version at position 0 must be one of uuidv1, uuidv2, uuidv3, uuidv4, uuidv5');
+            expect(() => Joi.string().guid({ version: '42' })).to.throw('version at position 0 must be one of uuidv1, uuidv2, uuidv3, uuidv4, uuidv5, uuidv6, uuidv7, uuidv8');
         });
 
         it('throws when options.separator is invalid', () => {
@@ -2653,12 +2739,325 @@ describe('string', () => {
             ]);
         });
 
-        it('validates multiple uuid versions (1,3,5)', () => {
+        it('validates uuidv6', () => {
 
-            Helper.validate(Joi.string().guid({ version: ['uuidv1', 'uuidv3', 'uuidv5'] }), [
+            Helper.validate(Joi.string().guid({ version: ['uuidv6'] }), [
+                ['{D1A5279D-B27D-6CD4-A05E-EFDD53D08E8D}', true],
+                ['{B59511BD6A5F6DF09ECF562A108D8A2E}', true],
+                ['69593D62-71EA-6548-85E4-04FC71357423', true],
+                ['677E2553DD4D63B09DA77414DB1EB8EA', true],
+                ['{5ba3bba3-729a-6717-88c1-b7c4b7ba80db}', true],
+                ['{7e9081b59a6d6cc1a8c347f69fb4198d}', true],
+                ['0c74f13f-fa83-6c48-9b33-68921dd72463', true],
+                ['b4b2fb69c6246e5eb0698e0c6ec66618', true],
+                ['{D1A5279D-B27D-4CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-4CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-6CD4-C05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-6CD4-C05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{283B67B2-430F-6E6F-97E6-19041992-C1B0}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{283B67B2-430F-6E6F-97E6-19041992-C1B0}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-6CD4-A05E-EFDD53D08E8D', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-6CD4-A05E-EFDD53D08E8D',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-6CD4-A05E-EFDD53D08E8D]', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-6CD4-A05E-EFDD53D08E8D]',
+                        label: 'value'
+                    }
+                }],
+                ['D1A5279D-B27D-6CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: 'D1A5279D-B27D-6CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D:B27D-6CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D:B27D-6CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D:6CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D:6CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-6CD4:A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-6CD4:A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-6CD4-A05E:EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-6CD4-A05E:EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }]
+            ]);
+        });
+
+        it('validates uuidv7', () => {
+
+            Helper.validate(Joi.string().guid({ version: ['uuidv7'] }), [
+                ['{D1A5279D-B27D-7CD4-A05E-EFDD53D08E8D}', true],
+                ['{B59511BD6A5F7DF09ECF562A108D8A2E}', true],
+                ['69593D62-71EA-7548-85E4-04FC71357423', true],
+                ['677E2553DD4D73B09DA77414DB1EB8EA', true],
+                ['{5ba3bba3-729a-7717-88c1-b7c4b7ba80db}', true],
+                ['{7e9081b59a6d7cc1a8c347f69fb4198d}', true],
+                ['0c74f13f-fa83-7c48-9b33-68921dd72463', true],
+                ['b4b2fb69c6247e5eb0698e0c6ec66618', true],
+                ['{D1A5279D-B27D-4CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-4CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-7CD4-C05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-7CD4-C05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{283B67B2-430F-7E6F-97E6-19041992-C1B0}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{283B67B2-430F-7E6F-97E6-19041992-C1B0}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-7CD4-A05E-EFDD53D08E8D', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-7CD4-A05E-EFDD53D08E8D',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-7CD4-A05E-EFDD53D08E8D]', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-7CD4-A05E-EFDD53D08E8D]',
+                        label: 'value'
+                    }
+                }],
+                ['D1A5279D-B27D-7CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: 'D1A5279D-B27D-7CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D:B27D-7CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D:B27D-7CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D:7CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D:7CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-7CD4:A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-7CD4:A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-7CD4-A05E:EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-7CD4-A05E:EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }]
+            ]);
+        });
+
+        it('validates uuidv8', () => {
+
+            Helper.validate(Joi.string().guid({ version: ['uuidv8'] }), [
+                ['{D1A5279D-B27D-8CD4-A05E-EFDD53D08E8D}', true],
+                ['{B59511BD6A5F8DF09ECF562A108D8A2E}', true],
+                ['69593D62-71EA-8548-85E4-04FC71357423', true],
+                ['677E2553DD4D83B09DA77414DB1EB8EA', true],
+                ['{5ba3bba3-729a-8717-88c1-b7c4b7ba80db}', true],
+                ['{7e9081b59a6d8cc1a8c347f69fb4198d}', true],
+                ['0c74f13f-fa83-8c48-9b33-68921dd72463', true],
+                ['b4b2fb69c6248e5eb0698e0c6ec66618', true],
+                ['{D1A5279D-B27D-4CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-4CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-8CD4-C05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-8CD4-C05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{283B67B2-430F-8E6F-97E6-19041992-C1B0}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{283B67B2-430F-8E6F-97E6-19041992-C1B0}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-8CD4-A05E-EFDD53D08E8D', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-8CD4-A05E-EFDD53D08E8D',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-8CD4-A05E-EFDD53D08E8D]', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-8CD4-A05E-EFDD53D08E8D]',
+                        label: 'value'
+                    }
+                }],
+                ['D1A5279D-B27D-8CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: 'D1A5279D-B27D-8CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D:B27D-8CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D:B27D-8CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D:8CD4-A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D:8CD4-A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-8CD4:A05E-EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-8CD4:A05E-EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }],
+                ['{D1A5279D-B27D-8CD4-A05E:EFDD53D08E8D}', false, {
+                    message: '"value" must be a valid GUID',
+                    path: [],
+                    type: 'string.guid',
+                    context: {
+                        value: '{D1A5279D-B27D-8CD4-A05E:EFDD53D08E8D}',
+                        label: 'value'
+                    }
+                }]
+            ]);
+        });
+
+        it('validates multiple uuid versions (1,3,5,7)', () => {
+
+            Helper.validate(Joi.string().guid({ version: ['uuidv1', 'uuidv3', 'uuidv5', 'uuidv7'] }), [
                 ['{D1A5279D-B27D-1CD4-805E-EFDD53D08E8D}', true],
                 ['{D1A5279D-B27D-3CD4-905E-EFDD53D08E8D}', true],
                 ['{D1A5279D-B27D-5CD4-A05E-EFDD53D08E8D}', true],
+                ['{D1A5279D-B27D-7CD4-A05E-EFDD53D08E8D}', true],
                 ['{B59511BD6A5F5DF09ECF562A108D8A2E}', true],
                 ['69593D62-71EA-5548-85E4-04FC71357423', true],
                 ['677E2553DD4D53B09DA77414DB1EB8EA', true],
@@ -4173,6 +4572,49 @@ describe('string', () => {
                 }]
             ]);
         });
+
+        it('validates an hexadecimal string with prefix explicitly required', () => {
+
+            const rule = Joi.string().hex({ prefix: true }).strict();
+            Helper.validate(rule, [
+                ['0123456789abcdef', false, {
+                    message: '"value" must only contain hexadecimal characters',
+                    path: [],
+                    type: 'string.hex',
+                    context: { value: '0123456789abcdef', label: 'value' }
+                }],
+                ['0x0123456789abcdef', true],
+                ['0X0123456789abcdef', true]
+            ]);
+        });
+
+        it('validates an hexadecimal string with optional prefix', () => {
+
+            const rule = Joi.string().hex({ prefix: 'optional' }).strict();
+            Helper.validate(rule, [
+                ['0123456789abcdef', true],
+                ['0x0123456789abcdef', true],
+                ['0X0123456789abcdef', true],
+                ['0123456789abcdefg', false, {
+                    message: '"value" must only contain hexadecimal characters',
+                    path: [],
+                    type: 'string.hex',
+                    context: { value: '0123456789abcdefg', label: 'value' }
+                }],
+                ['0x0123456789abcdefg', false, {
+                    message: '"value" must only contain hexadecimal characters',
+                    path: [],
+                    type: 'string.hex',
+                    context: { value: '0x0123456789abcdefg', label: 'value' }
+                }],
+                ['0X0123456789abcdefg', false, {
+                    message: '"value" must only contain hexadecimal characters',
+                    path: [],
+                    type: 'string.hex',
+                    context: { value: '0X0123456789abcdefg', label: 'value' }
+                }]
+            ]);
+        });
     });
 
     describe('hostname()', () => {
@@ -4211,6 +4653,18 @@ describe('string', () => {
                     path: [],
                     type: 'string.hostname',
                     context: { value: '0:?:0:0:0:0:0:1', label: 'value' }
+                }],
+                ['10.10.10.10/24', false, {
+                    message: '"value" must be a valid hostname',
+                    path: [],
+                    type: 'string.hostname',
+                    context: { value: '10.10.10.10/24', label: 'value' }
+                }],
+                ['2001:db8::/48', false, {
+                    message: '"value" must be a valid hostname',
+                    path: [],
+                    type: 'string.hostname',
+                    context: { value: '2001:db8::/48', label: 'value' }
                 }]
             ]);
         });
@@ -4576,7 +5030,7 @@ describe('string', () => {
 
         it('throws when options.cidr is not a string', () => {
 
-            expect(() => Joi.string().ip({ cidr: 42 })).to.throw('options.cidr must be a string');
+            expect(() => Joi.string().ip({ cidr: 42 })).to.throw('options.cidr must be one of required, optional, forbidden');
         });
 
         it('throws when options.cidr is not a valid value', () => {
@@ -5246,6 +5700,14 @@ describe('string', () => {
             ]);
         });
 
+        it('throws when limit is undefined', () => {
+
+            expect(() => {
+
+                Joi.string().length();
+            }).to.throw('limit must be a positive integer or reference');
+        });
+
         it('throws when limit is not a number', () => {
 
             expect(() => {
@@ -5447,6 +5909,14 @@ describe('string', () => {
             ]);
         });
 
+        it('throws when limit is undefined', () => {
+
+            expect(() => {
+
+                Joi.string().max();
+            }).to.throw('limit must be a positive integer or reference');
+        });
+
         it('throws when limit is not a number', () => {
 
             expect(() => {
@@ -5560,6 +6030,14 @@ describe('string', () => {
 
     describe('min()', () => {
 
+        it('throws when limit is undefined', () => {
+
+            expect(() => {
+
+                Joi.string().min();
+            }).to.throw('limit must be a positive integer or reference');
+        });
+
         it('throws when limit is not a number', () => {
 
             expect(() => {
@@ -5600,6 +6078,14 @@ describe('string', () => {
                         label: 'value'
                     }
                 }]
+            ]);
+        });
+
+        it('allows empty string when min explicitly set to zero', () => {
+
+            Helper.validate(Joi.string().min(0), [
+                [undefined, true],
+                ['', true]
             ]);
         });
 
@@ -7422,6 +7908,12 @@ describe('string', () => {
 
                 Joi.string().uri({});
             }).to.not.throw();
+        });
+
+        it('handles missing domain', () => {
+
+            const schema = Joi.string().uri({ domain: { tlds: { allow: true } } });
+            expect(() => schema.validate('http:example.com')).to.not.throw();
         });
 
         it('validates uri requires uriOptions as an object', () => {

@@ -94,7 +94,7 @@ const { error, value } = schema.validate({ a: 'a string' });
 ```
 
 If the input is valid, then the `error` will be `undefined`. If the input is invalid, `error` is assigned
-a [`ValidationError`](https://github.com/sideway/joi/blob/master/API.md#validationerror) object
+a [`ValidationError`](#validationerror) object
 providing more information.
 
 The schema can be a plain JavaScript object where every key is assigned a **joi** type, or it can be a **joi** type directly:
@@ -233,7 +233,8 @@ const schema = custom.object();   // Returns Joi.object().min(1)
 Generates a dynamic expression using a template string where:
 - `template` - the template string using the [template syntax](#template-syntax).
 - `options` - optional settings used when creating internal references. Supports the same options
-  as [`ref()`](#refkey-options).
+  as [`ref()`](#refkey-options), in addition to those options:
+  - `functions` - an object with keys being function names and values being their implementation that will be executed when used in the expression. Using the same name as a built-in function will result in a local override. Note: carefully check your arguments depending on the situation where the expression is used.
 
 #### Template syntax
 
@@ -252,6 +253,7 @@ The reference names can have one of the following prefixes:
 
 The formula syntax also supports built-in functions:
 - `if(condition, then, otherwise)` - returns `then` when `condition` is truthy, otherwise `otherwise`.
+- `length(item)` - return the length of an array or string, the number of keys of an object, otherwise `null`.
 - `msg(code)` - embeds another error code message.
 - `number(value)` - cast value to a number.
 
@@ -612,7 +614,7 @@ Adds a custom validation function to execute arbitrary code where:
         - `state` - the current validation state.
         - `prefs` - the current preferences.
         - `original` - the original value passed into validation before any conversions.
-        - `error(code, [local])` - a method to generate error codes using a message code and optional local context.
+        - `error(code, [local], [localState])` - a method to generate error codes using a message code, optional local context and optional validation local state.
         - `message(messages, [local])` - a method to generate an error with an internal `'custom'` error code and the provided messages object to use as override. Note that this is much slower than using the preferences `messages` option but is much simpler to write when performance is not important.
         - `warn(code, [local])` - a method to add a warning using a message code and optional local context.
 
@@ -782,7 +784,14 @@ Adds an external validation rule where:
   return a replacement value, `undefined` to indicate no change, or throw an error, where:
     - `value` - a clone of the object containing the value being validated.
     - `helpers` - an object with the following helpers:
+        - `schema` - the current schema.
+        - `linked` - if the schema is a link, the schema it links to.
+        - `state` - the current validation state.
         - `prefs` - the current preferences.
+        - `original` - the original value passed into validation before any conversions.
+        - `error(code, [local])` - a method to generate error codes using a message code and optional local context.
+        - `message(messages, [local])` - a method to generate an error with an internal `'external'` error code and the provided messages object to use as override. Note that this is much slower than using the preferences `messages` option but is much simpler to write when performance is not important.
+        - `warn(code, [local])` - a method to add a warning using a message code and optional local context.
 - `description` - optional string used to document the purpose of the method.
 
 Note that external validation rules are only called after the all other validation rules for the
@@ -1006,7 +1015,7 @@ const schema = Joi.number().$.min(1).max(10).rule({ message: 'Number must be bet
 
 #### `any.shared(schema)`
 
-Registers a schema to be used by decendents of the current schema in named link references, where:
+Registers a schema to be used by descendants of the current schema in named link references, where:
 - `schema` - a **joi** schema with an id.
 
 ```js
@@ -1121,17 +1130,18 @@ Validates a value using the current schema and options where:
       - `'path'` - the full path to the value being validated. This is the default value.
       - `'key'` - the key of the value being validated.
       - `false` - remove any label prefix from error message, including the `""`.
-    - `language` - the preferred language code for error messages. The value is matched against keys at the root of the `messages` object, and then the error code as a child key of that. Can be a reference to the value, global context, or local context which is the root value passed to the validation function. Note that references to the value are usually not what you want as they move around the value structure relative to where the error happens. Instead, either use the global  context, or the absolute value (e.g. `Joi.ref('/variable')`);
+    - `language` - the preferred language code for error messages. The value is matched against keys at the root of the `messages` object, and then the error code as a child key of that. Can be a reference to the value, global context, or local context which is the root value passed to the validation function. Note that references to the value are usually not what you want as they move around the value structure relative to where the error happens. Instead, either use the global context, or the absolute value (e.g. `Joi.ref('/variable')`);
     - `render` - when `false`, skips rendering error templates. Useful when error messages are generated elsewhere to save processing time. Defaults to `true`.
     - `stack` - when `true`, the main error will possess a stack trace, otherwise it will be disabled. Defaults to `false` for performance reasons. Has no effect on platforms other than V8/node.js as it uses the [Stack trace API](https://v8.dev/docs/stack-trace-api).
     - `wrap` - overrides the way values are wrapped (e.g. `[]` around arrays, `""` around labels and variables prefixed with `:`). Each key can be set to a string with one (same character before and after the value) or two characters (first character before and second character after), or `false` to disable wrapping:
         - `label` - the characters used around `{#label}` references. Defaults to `'"'`.
         - `array` - the characters used around array values. Defaults to `'[]'`.
+        - `string` - the characters used around each array string values. Defaults to `false`.
     - `wrapArrays` - if `true`, array values in error messages are wrapped in `[]`. Defaults to `true`.
   - `externals` - if `false`, the external rules set with [`any.external()`](#anyexternalmethod-description) are ignored, which is required to ignore any external validations in synchronous mode (or an exception is thrown). Defaults to `true`.
-  - `messages` - overrides individual error messages. Defaults to no override (`{}`). Messages use the same rules as [templates](#template-syntax). Variables in double braces `{{var}}` are HTML escaped if the option `errors.escapeHtml` is set to `true`.
+  - `messages` - overrides individual error messages. Defaults to no override (`{}`). Use the `'*'` error code as a catch-all for all error codes that do not have a message provided in the override. Messages use the same rules as [templates](#template-syntax). Variables in double braces `{{var}}` are HTML escaped if the option `errors.escapeHtml` is set to `true`.
   - `noDefaults` - when `true`, do not apply default values. Defaults to `false`.
-  - `nonEnumerables` - when `true`, inputs are shallow cloned to include non-enumerables properties. Defaults to `false`.
+  - `nonEnumerables` - when `true`, inputs are shallow cloned to include non-enumerable properties. Defaults to `false`.
   - `presence` - sets the default presence requirements. Supported modes: `'optional'`, `'required'`, and `'forbidden'`. Defaults to `'optional'`.
   - `skipFunctions` - when `true`, ignores unknown keys with a function value. Defaults to `false`.
   - `stripUnknown` - remove unknown elements from objects and arrays. Defaults to `false`.
@@ -1800,6 +1810,10 @@ await boolean.validateAsync('Y'); // Valid
 
 Generates a schema object that matches a date type (as well as a JavaScript date string or number of milliseconds). If the validation `convert` option is on (enabled by default), a string or number will be converted to a Date if specified. Note that some invalid date strings will be accepted if they can be adjusted to valid dates (e.g. `'2/31/2019'` will be converted to `'3/3/2019'`) by the internal JS `Date.parse()` implementation.
 
+Note: When **joi** is used in a browser environment, the parsing of date strings with the Date
+constructor (and Date.parse(), which works the same way) is strongly discouraged due to browser
+differences and inconsistencies. For example `'1-1-1910'` is valid in Chrome but will error in Safari.
+
 Supports the same methods of the [`any()`](#any) type.
 
 ```js
@@ -1994,7 +2008,7 @@ Supports the methods of the [`any()`](#any) type.
 
 When links are combined with `any.when()` rules, the rules are applied after the link is resolved to the linked schema.
 
-Names links are recommended for most use cases as they are easy to reason and understand, and when mistakes are made, they simply error with invalid link message. Relative links are often hard to follow, especially when they are nested in array or alternatives rules. Absolute links are useful only when the schema is never reused inside another schema as the root is the run-time root of the schema being validated, not the current schema root.
+Named links are recommended for most use cases as they are easy to reason and understand, and when mistakes are made, they simply error with invalid link message. Relative links are often hard to follow, especially when they are nested in array or alternatives rules. Absolute links are useful only when the schema is never reused inside another schema as the root is the run-time root of the schema being validated, not the current schema root.
 
 Note that named links must be found in a direct ancestor of the link. The names are searched by iterating over the chain of schemas from the current schema to the root. To reach an uncle or cousin, you must use the name of a common ancestor such as a grandparent and then walk down the tree.
 
@@ -2040,7 +2054,7 @@ const person = Joi.object({
 #### `link.ref(ref)`
 
 Initializes the schema after constructions for cases where the schema has to be constructed first and
-then initialized. If `ref` was not passed to the constructor, `link.ref()` must be called prior to usaged.
+then initialized. If `ref` was not passed to the constructor, `link.ref()` must be called prior to usage.
 
 Will throw an error during validation if left uninitialized (e.g. `Joi.link()` called without a link and `link.ref()` not called).
 
@@ -2268,6 +2282,7 @@ them are required as well where:
 - `peers` - the string key names of which if one present, all are required.
 - `options` - optional settings:
     - `separator` - overrides the default `.` hierarchy separator. Set to `false` to treat the `key` as a literal value.
+    - `isPresent` - function that overrides the default check for an empty value. Default: `(resolved) => resolved !== undefined`
 
 ```js
 const schema = Joi.object({
@@ -2388,6 +2403,7 @@ Defines a relationship between keys where not all peers can be present at the sa
 - `peers` - the key names of which if one present, the others may not all be present.
 - `options` - optional settings:
     - `separator` - overrides the default `.` hierarchy separator. Set to `false` to treat the `key` as a literal value.
+    - `isPresent` - function that overrides the default check for an empty value. Default: `(resolved) => resolved !== undefined`
 
 ```js
 const schema = Joi.object({
@@ -2405,6 +2421,7 @@ allowed) where:
 - `peers` - the key names of which at least one must appear.
 - `options` - optional settings:
     - `separator` - overrides the default `.` hierarchy separator. Set to `false` to treat the `key` as a literal value.
+    - `isPresent` - function that overrides the default check for an empty value. Default: `(resolved) => resolved !== undefined`
 
 ```js
 const schema = Joi.object({
@@ -2422,6 +2439,7 @@ required where:
 - `peers` - the exclusive key names that must not appear together but where none are required.
 - `options` - optional settings:
     - `separator` - overrides the default `.` hierarchy separator. Set to `false` to treat the `key` as a literal value.
+    - `isPresent` - function that overrides the default check for an empty value. Default: `(resolved) => resolved !== undefined`
 
 ```js
 const schema = Joi.object({
@@ -2514,7 +2532,7 @@ Using a regular expression with template:
 
 ```js
 const schema = Joi.object()
-    .rename(/^(\d+)$/, Joi.template('x{#1}x'))
+    .rename(/^(\d+)$/, Joi.expression('x{#1}x'))
     .pattern(/^x\d+x$/, Joi.any());
 
 const input = {
@@ -2560,6 +2578,7 @@ Requires the presence of other keys whenever the specified key is present where:
   single string value or an array of string values.
 - `options` - optional settings:
     - `separator` - overrides the default `.` hierarchy separator. Set to `false` to treat the `key` as a literal value.
+    - `isPresent` - function that overrides the default check for an empty value. Default: `(resolved) => resolved !== undefined`
 
 Note that unlike [`object.and()`](#objectandpeers-options), `with()` creates a dependency only between the `key` and each of the `peers`, not
 between the `peers` themselves.
@@ -2581,6 +2600,7 @@ Forbids the presence of other keys whenever the specified is present where:
   single string value or an array of string values.
 - `options` - optional settings:
     - `separator` - overrides the default `.` hierarchy separator. Set to `false` to treat the `key` as a literal value.
+    - `isPresent` - function that overrides the default check for an empty value. Default: `(resolved) => resolved !== undefined`
 
 ```js
 const schema = Joi.object({
@@ -2598,6 +2618,7 @@ the same time where:
 - `peers` - the exclusive key names that must not appear together but where one of them is required.
 - `options` - optional settings:
     - `separator` - overrides the default `.` hierarchy separator. Set to `false` to treat the `key` as a literal value.
+    - `isPresent` - function that overrides the default check for an empty value. Default: `(resolved) => resolved !== undefined`
 
 ```js
 const schema = Joi.object({
@@ -2712,7 +2733,9 @@ Possible validation errors: [`string.dataUri`](#stringdatauri)
 Requires the string value to be a valid domain name.
 
 - `options` - optional settings:
+    - `allowFullyQualified` - if `true`, domains ending with a `.` character are permitted. Defaults to `false`.
     - `allowUnicode` - if `true`, Unicode characters are permitted. Defaults to `true`.
+    - `allowUnderscore` - if `true`, underscores (`_`) are allowed in the domain name. Defaults to `false`.
     - `minDomainSegments` - number of segments required for the domain. Defaults to `2`.
     - `maxDomainSegments` - maximum number of allowed domain segments. Default to no limit.
     - `tlds` - options for TLD (top level domain) validation. By default, the TLD must be a valid
@@ -2738,7 +2761,9 @@ Possible validation errors: [`string.domain`](#stringdomain)
 Requires the string value to be a valid email address.
 
 - `options` - optional settings:
+    - `allowFullyQualified` - if `true`, domains ending with a `.` character are permitted. Defaults to `false`.
     - `allowUnicode` - if `true`, Unicode characters are permitted. Defaults to `true`.
+    - `allowUnderscore` - if `true`, underscores (`_`) are allowed in the domain name. Defaults to `false`.
     - `ignoreLength` - if `true`, ignore invalid email length errors. Defaults to `false`.
     - `minDomainSegments` - number of segments required for the domain. The default setting excludes
       single segment domains such as `example@io` which is a valid email but very uncommon. Defaults
@@ -2774,7 +2799,7 @@ Requires the string value to be a valid GUID.
 
 - `options` - optional settings:
     - `version` - specifies one or more acceptable versions. Can be an Array or String with the following values:
-      `uuidv1`, `uuidv2`, `uuidv3`, `uuidv4`, or `uuidv5`. If no `version` is specified then it is assumed to be a generic `guid`
+      `uuidv1`, `uuidv2`, `uuidv3`, `uuidv4`, `uuidv5`, `uuidv6`, `uuidv7` or `uuidv8`. If no `version` is specified then it is assumed to be a generic `guid`
       which will not validate the version or variant of the guid and just check for general structure format.
     - `separator` - defines the allowed or required GUID separator where:
         - `true` - a separator is required, can be either `:` or `-`.
@@ -2800,8 +2825,9 @@ Requires the string value to be a valid hexadecimal string.
 
 - `options` - optional settings:
   - `byteAligned` - Boolean specifying whether you want to check that the hexadecimal string is byte aligned. If `convert` is `true`, a `0` will be added in front of the string in case it needs to be aligned. Defaults to `false`.
+  - `prefix` - Boolean or `optional`. When `true`, the string will be considered valid if prefixed with `0x` or `0X`. When `false`, the prefix is forbidden. When `optional`, the string will be considered valid if prefixed or not prefixed at all. Defaults to `false`.
 ```js
-const schema = Joi.string().hex();
+const schema = Joi.string().hex({ prefix: 'optional' });
 ```
 
 Possible validation errors: [`string.hex`](#stringhex), [`string.hexAlign`](#stringhexalign)
@@ -3115,7 +3141,7 @@ Before writing your own extensions, it is useful to understand how input values 
 - Returns the result if caching is enabled and the input value is found in the cache. 
 - Runs the `prepare` method defined below. If a validation error is returned, the process will be aborted regardless of `abortEarly`.
 - Coerces the input value using the `coerce` method defined below if `convert` is enabled. If a validation error is returned, the process will be aborted regardless of `abortEarly`.
-- If the input alue matches the schema passed to [`any.empty()`](#anyemptyschema)), it is converted to `undefined`.
+- If the input value matches the schema passed to [`any.empty()`](#anyemptyschema), it is converted to `undefined`.
 - Validates presences.
 - Validates allowed/valid/invalid values.
 - Runs base validation using the `validate` method defined below. If a validation error is returned, the process will be aborted regardless of `abortEarly`.
@@ -3575,7 +3601,7 @@ Additional local context properties:
 ```ts
 {
     knownMisses: Array<string>, // Labels of all the missing values
-    unknownMisees: number // Count of missing values that didn't have a label
+    unknownMisses: number // Count of missing values that didn't have a label
 }
 ```
 
@@ -3597,7 +3623,7 @@ Some values were expected to be present in the array and are missing. This error
 Additional local context properties:
 ```ts
 {
-    unknownMisees: number // Count of missing values that didn't have a label
+    unknownMisses: number // Count of missing values that didn't have a label
 }
 ```
 
