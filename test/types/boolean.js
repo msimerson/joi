@@ -31,6 +31,14 @@ describe('boolean', () => {
         ]);
     });
 
+    it('converts boolean string with trailing spaces to a boolean', () => {
+
+        Helper.validate(Joi.boolean(), [
+            ['true ', true, true],
+            ['false ', true, false]
+        ]);
+    });
+
     it('does not convert boolean string to a boolean in strict mode', () => {
 
         Helper.validate(Joi.boolean().strict(), [
